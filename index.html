@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>☁️ Cloud File Upload & Retrieval using Supabase</title>
+  <script type="module">
+    import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm";
+
+    // 🔑 Your Supabase details
+    const SUPABASE_URL = "https://kqcvixdtdzvfrijcfvyx.supabase.co";
+    const SUPABASE_ANON_KEY =
+      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtxY3ZpeGR0ZHp2ZnJpamNmdnl4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE4OTU1NDgsImV4cCI6MjA3NzQ3MTU0OH0.rQozBqIErszWOAFGJEpUjO7xdSUqu7uQMB8YuWxYe8s";
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const bucketName = "uploads"; // Must match your bucket name exactly
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const uploadInput = document.getElementById("fileUpload");
+      const status = document.getElementById("status");
+      const preview = document.getElementById("preview");
+      const fileList = document.getElementById("fileList");
+
+      // 🔹 Upload Function
+      uploadInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        status.textContent = "⏳ Uploading...";
+
+        try {
+          // Upload file to Supabase
+          const { error } = await supabase.storage
+            .from(bucketName)
+            .upload(file.name, file, { upsert: true });
+
+          if (error) throw error;
+
+          const publicUrl = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${file.name}`;
+          status.innerHTML = `✅ Uploaded successfully!<br><a href="${publicUrl}" target="_blank">${publicUrl}</a>`;
+          preview.innerHTML = `<h3>Preview:</h3><img src="${publicUrl}" alt="Uploaded" style="max-width:300px;margin-top:10px;border-radius:10px;box-shadow:0 2px 6px rgba(0,0,0,0.2);" />`;
+
+          // Refresh file list after upload
+          loadFiles();
+        } catch (err) {
+          status.textContent = "❌ Upload failed: " + err.message;
+        }
+      });
+
+      // 🔹 Retrieval Function (List all files)
+      async function loadFiles() {
+        fileList.innerHTML = "⏳ Loading files...";
+        const { data, error } = await supabase.storage.from(bucketName).list("", { limit: 100 });
+
+        if (error) {
+          fileList.innerHTML = "❌ Failed to load files: " + error.message;
+          return;
+        }
+
+        if (!data || data.length === 0) {
+          fileList.innerHTML = "<p>No files found in storage.</p>";
+          return;
+        }
+
+        fileList.innerHTML = "";
+        data.forEach((item) => {
+          const fileUrl = `${SUPABASE_URL}/storage/v1/object/public/${bucketName}/${item.name}`;
+          const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(item.name);
+
+          const fileCard = document.createElement("div");
+          fileCard.style.cssText =
+            "display:inline-block; margin:15px; padding:10px; border:1px solid #ddd; border-radius:10px; width:200px; box-shadow:0 2px 4px rgba(0,0,0,0.1);";
+          fileCard.innerHTML = `
+            ${isImage ? `<img src="${fileUrl}" alt="${item.name}" style="width:100%; border-radius:10px;">` : "📄"}
+            <p style="font-size:14px; margin-top:5px; word-wrap:break-word;">${item.name}</p>
+            <a href="${fileUrl}" target="_blank">Download</a>
+          `;
+          fileList.appendChild(fileCard);
+        });
+      }
+
+      // Load files when page opens
+      loadFiles();
+    });
+  </script>
+</head>
+<body style="font-family: Poppins, Arial; text-align:center; margin-top:40px;">
+  <h1>☁️ Cloud File Upload & Retrieval using Supabase</h1>
+  <p>Upload an image or file and view all stored files instantly!</p>
+  <input type="file" id="fileUpload" />
+  <p id="status" style="font-weight:600; margin-top:15px;"></p>
+  <div id="preview" style="margin-top:20px;"></div>
+  <hr style="margin:40px 0;">
+  <h2>📂 Stored Files</h2>
+  <div id="fileList" style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px;"></div>
+</body>
+</html>
